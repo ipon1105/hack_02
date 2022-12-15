@@ -1,0 +1,15 @@
+/home/ivan/Документы/hack_02/back/bin/Debug/net7.0/back
+/home/ivan/Документы/hack_02/back/bin/Debug/net7.0/back.deps.json
+/home/ivan/Документы/hack_02/back/bin/Debug/net7.0/back.runtimeconfig.json
+/home/ivan/Документы/hack_02/back/bin/Debug/net7.0/back.dll
+/home/ivan/Документы/hack_02/back/bin/Debug/net7.0/back.pdb
+/home/ivan/Документы/hack_02/back/obj/Debug/net7.0/back.csproj.AssemblyReference.cache
+/home/ivan/Документы/hack_02/back/obj/Debug/net7.0/back.GeneratedMSBuildEditorConfig.editorconfig
+/home/ivan/Документы/hack_02/back/obj/Debug/net7.0/back.AssemblyInfoInputs.cache
+/home/ivan/Документы/hack_02/back/obj/Debug/net7.0/back.AssemblyInfo.cs
+/home/ivan/Документы/hack_02/back/obj/Debug/net7.0/back.csproj.CoreCompileInputs.cache
+/home/ivan/Документы/hack_02/back/obj/Debug/net7.0/back.dll
+/home/ivan/Документы/hack_02/back/obj/Debug/net7.0/refint/back.dll
+/home/ivan/Документы/hack_02/back/obj/Debug/net7.0/back.pdb
+/home/ivan/Документы/hack_02/back/obj/Debug/net7.0/back.genruntimeconfig.cache
+/home/ivan/Документы/hack_02/back/obj/Debug/net7.0/ref/back.dll
