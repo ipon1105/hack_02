@@ -1,13 +1,13 @@
-using UnityEngine;
+﻿using UnityEngine;
 using System.Collections;
 
-public class motorScript : MonoBehaviour
-{
+public class motorScript : MonoBehaviour {
 
-    public float power = 0.0f;
+	public double power = 0.0f;
 
-    void FixedUpdate()
-    {
-        GetComponent<Rigidbody>().AddRelativeForce(0, power, 0);
-    }
+	void FixedUpdate () {
+	
+		GetComponent<Rigidbody> ().AddRelativeForce (0, (float)power, 0);
+
+	}
 }
