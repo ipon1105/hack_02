@@ -1,146 +1,143 @@
-using UnityEngine;
+п»їusing UnityEngine;
 using UnityEngine.UI;
 using System.Collections;
 using System;
 
-public class quadrocopterScript : MonoBehaviour
-{
+public class quadrocopterScript : MonoBehaviour {
 
-    //фактические параметры
-    private double pitch; //Тангаж
-    private double roll; //Крен
-    private double yaw; //Рыскание
-    public double throttle; //Газ, газ мы задаем извне, поэтому он public
+	//С„Р°РєС‚РёС‡РµСЃРєРёРµ РїР°СЂР°РјРµС‚СЂС‹
+	private double pitch; //РўР°РЅРіР°Р¶
+	private double roll; //РљСЂРµРЅ
+	private double yaw; //Р С‹СЃРєР°РЅРёРµ
+	public double throttle; //Р“Р°Р·, РіР°Р· РјС‹ Р·Р°РґР°РµРј РёР·РІРЅРµ, РїРѕСЌС‚РѕРјСѓ РѕРЅ public
 
-    //требуемые параметры
-    public double targetPitch;
-    public double targetRoll;
-    public double targetYaw;
+	//С‚СЂРµР±СѓРµРјС‹Рµ РїР°СЂР°РјРµС‚СЂС‹
+	public double targetPitch;
+	public double targetRoll;
+	public double targetYaw;
 
-    //PID регуляторы, которые будут стабилизировать углы
-    //каждому углу свой регулятор, класс PID определен ниже
-    //константы подобраны на глаз :) пробуйте свои значения
-    private PID pitchPID = new PID(100, 0, 20);
-    private PID rollPID = new PID(100, 0, 20);
-    private PID yawPID = new PID(50, 0, 50);
+	//PID СЂРµРіСѓР»СЏС‚РѕСЂС‹, РєРѕС‚РѕСЂС‹Рµ Р±СѓРґСѓС‚ СЃС‚Р°Р±РёР»РёР·РёСЂРѕРІР°С‚СЊ СѓРіР»С‹
+	//РєР°Р¶РґРѕРјСѓ СѓРіР»Сѓ СЃРІРѕР№ СЂРµРіСѓР»СЏС‚РѕСЂ, РєР»Р°СЃСЃ PID РѕРїСЂРµРґРµР»РµРЅ РЅРёР¶Рµ
+	//РєРѕРЅСЃС‚Р°РЅС‚С‹ РїРѕРґРѕР±СЂР°РЅС‹ РЅР° РіР»Р°Р· :) РїСЂРѕР±СѓР№С‚Рµ СЃРІРѕРё Р·РЅР°С‡РµРЅРёСЏ
+	private PID pitchPID = new PID (100, 0, 20);
+	private PID rollPID = new PID (100, 0, 20);
+	private PID yawPID = new PID (50, 0, 50);
 
-    void readRotation()
-    {
+	private Quaternion prevRotation = new Quaternion (0, 1, 0, 0);
 
-        //фактическая ориентация нашего квадрокоптера,
-        //в реальном квадрокоптере эти данные необходимо получать
-        //из акселерометра-гироскопа-магнетометра, так же как делает это ваш
-        //смартфон
-        Vector3 rot = GameObject.Find("Frame").GetComponent<Transform>().rotation.eulerAngles;
-        pitch = rot.x;
-        yaw = rot.y;
-        roll = rot.z;
+	void readRotation () {
+		
+		//С„Р°РєС‚РёС‡РµСЃРєР°СЏ РѕСЂРёРµРЅС‚Р°С†РёСЏ РЅР°С€РµРіРѕ РєРІР°РґСЂРѕРєРѕРїС‚РµСЂР°,
+		//РІ СЂРµР°Р»СЊРЅРѕРј РєРІР°РґСЂРѕРєРѕРїС‚РµСЂРµ СЌС‚Рё РґР°РЅРЅС‹Рµ РЅРµРѕР±С…РѕРґРёРјРѕ РїРѕР»СѓС‡Р°С‚СЊ
+		//РёР· Р°РєСЃРµР»РµСЂРѕРјРµС‚СЂР°-РіРёСЂРѕСЃРєРѕРїР°-РјР°РіРЅРµС‚РѕРјРµС‚СЂР°, С‚Р°Рє Р¶Рµ РєР°Рє РґРµР»Р°РµС‚ СЌС‚Рѕ РІР°С€
+		//СЃРјР°СЂС‚С„РѕРЅ
+		Vector3 rot = GameObject.Find ("Frame").GetComponent<Transform> ().rotation.eulerAngles;
+		pitch = rot.x;
+		yaw = rot.y;
+		roll = rot.z;
 
-    }
+	}
 
-    //функция стабилизации квадрокоптера
-    //с помощью PID регуляторов мы настраиваем
-    //мощность наших моторов так, чтобы углы приняли нужные нам значения
-    void stabilize()
-    {
+	//С„СѓРЅРєС†РёСЏ СЃС‚Р°Р±РёР»РёР·Р°С†РёРё РєРІР°РґСЂРѕРєРѕРїС‚РµСЂР°
+	//СЃ РїРѕРјРѕС‰СЊСЋ PID СЂРµРіСѓР»СЏС‚РѕСЂРѕРІ РјС‹ РЅР°СЃС‚СЂР°РёРІР°РµРј
+	//РјРѕС‰РЅРѕСЃС‚СЊ РЅР°С€РёС… РјРѕС‚РѕСЂРѕРІ С‚Р°Рє, С‡С‚РѕР±С‹ СѓРіР»С‹ РїСЂРёРЅСЏР»Рё РЅСѓР¶РЅС‹Рµ РЅР°Рј Р·РЅР°С‡РµРЅРёСЏ
+	void stabilize () {
 
-        //нам необходимо посчитать разность между требуемым углом и текущим
-        //эта разность должна лежать в промежутке [-180, 180] чтобы обеспечить
-        //правильную работу PID регуляторов, так как нет смысла поворачивать на 350
-        //градусов, когда можно повернуть на -10
+		//РЅР°Рј РЅРµРѕР±С…РѕРґРёРјРѕ РїРѕСЃС‡РёС‚Р°С‚СЊ СЂР°Р·РЅРѕСЃС‚СЊ РјРµР¶РґСѓ С‚СЂРµР±СѓРµРјС‹Рј СѓРіР»РѕРј Рё С‚РµРєСѓС‰РёРј
+		//СЌС‚Р° СЂР°Р·РЅРѕСЃС‚СЊ РґРѕР»Р¶РЅР° Р»РµР¶Р°С‚СЊ РІ РїСЂРѕРјРµР¶СѓС‚РєРµ [-180, 180] С‡С‚РѕР±С‹ РѕР±РµСЃРїРµС‡РёС‚СЊ
+		//РїСЂР°РІРёР»СЊРЅСѓСЋ СЂР°Р±РѕС‚Сѓ PID СЂРµРіСѓР»СЏС‚РѕСЂРѕРІ, С‚Р°Рє РєР°Рє РЅРµС‚ СЃРјС‹СЃР»Р° РїРѕРІРѕСЂР°С‡РёРІР°С‚СЊ РЅР° 350
+		//РіСЂР°РґСѓСЃРѕРІ, РєРѕРіРґР° РјРѕР¶РЅРѕ РїРѕРІРµСЂРЅСѓС‚СЊ РЅР° -10
 
-        double dPitch = targetPitch - pitch;
-        double dRoll = targetRoll - roll;
-        double dYaw = targetYaw - yaw;
+		double dPitch = targetPitch - pitch;
+		double dRoll = targetRoll - roll;
+		double dYaw = targetYaw - yaw;
 
-        dPitch -= Math.Ceiling(Math.Floor(dPitch / 180.0) / 2.0) * 360.0;
-        dRoll -= Math.Ceiling(Math.Floor(dRoll / 180.0) / 2.0) * 360.0;
-        dYaw -= Math.Ceiling(Math.Floor(dYaw / 180.0) / 2.0) * 360.0;
+		dPitch -= Math.Ceiling (Math.Floor (dPitch / 180.0) / 2.0) * 360.0;
+		dRoll -= Math.Ceiling (Math.Floor (dRoll / 180.0) / 2.0) * 360.0;
+		dYaw -= Math.Ceiling (Math.Floor (dYaw / 180.0) / 2.0) * 360.0;
 
-        //1 и 2 мотор впереди
-        //3 и 4 моторы сзади
-        double motor1power = throttle;
-        double motor2power = throttle;
-        double motor3power = throttle;
-        double motor4power = throttle;
+		//1 Рё 2 РјРѕС‚РѕСЂ РІРїРµСЂРµРґРё
+		//3 Рё 4 РјРѕС‚РѕСЂС‹ СЃР·Р°РґРё
+		double motor1power = throttle;
+		double motor2power = throttle;
+		double motor3power = throttle;
+		double motor4power = throttle;
 
-        //ограничитель на мощность подаваемую на моторы
-        double powerLimit = throttle > 20 ? 20 : throttle;
+		//РѕРіСЂР°РЅРёС‡РёС‚РµР»СЊ РЅР° РјРѕС‰РЅРѕСЃС‚СЊ РїРѕРґР°РІР°РµРјСѓСЋ РЅР° РјРѕС‚РѕСЂС‹,
+		//С‡С‚РѕР±С‹ РІ СЃСѓРјРјРµ РјРѕС‰РЅРѕСЃС‚СЊ РІСЃРµС… РјРѕС‚РѕСЂРѕРІ РѕСЃС‚Р°РІР°Р»Р°СЃСЊ
+		//РѕРґРёРЅР°РєРѕРІРѕР№ РїСЂРё СЂРµРіСѓР»РёСЂРѕРІРєРµ
+		double powerLimit = throttle > 20 ? 20 : throttle;
 
-        //управление тангажем:
-        //на передние двигатели подаем возмущение от регулятора
-        //на задние противоположное возмущение
-        double pitchForce = -pitchPID.calc(0, dPitch / 180.0);
-        pitchForce = pitchForce > powerLimit ? powerLimit : pitchForce;
-        pitchForce = pitchForce < -powerLimit ? -powerLimit : pitchForce;
-        motor1power += pitchForce;
-        motor2power += pitchForce;
-        motor3power += -pitchForce;
-        motor4power += -pitchForce;
+		//СѓРїСЂР°РІР»РµРЅРёРµ С‚Р°РЅРіР°Р¶РµРј:
+		//РЅР° РїРµСЂРµРґРЅРёРµ РґРІРёРіР°С‚РµР»Рё РїРѕРґР°РµРј РІРѕР·РјСѓС‰РµРЅРёРµ РѕС‚ СЂРµРіСѓР»СЏС‚РѕСЂР°
+		//РЅР° Р·Р°РґРЅРёРµ РїСЂРѕС‚РёРІРѕРїРѕР»РѕР¶РЅРѕРµ РІРѕР·РјСѓС‰РµРЅРёРµ
+		double pitchForce = - pitchPID.calc (0, dPitch / 180.0);
+		pitchForce = pitchForce > powerLimit ? powerLimit : pitchForce;
+		pitchForce = pitchForce < -powerLimit ? -powerLimit : pitchForce;
+		motor1power +=   pitchForce;
+		motor2power +=   pitchForce;
+		motor3power += - pitchForce;
+		motor4power += - pitchForce;
 
-        //управление креном:
-        //действуем по аналогии с тангажем, только регулируем боковые двигатели
-        double rollForce = -rollPID.calc(0, dRoll / 180.0);
-        rollForce = rollForce > powerLimit ? powerLimit : rollForce;
-        rollForce = rollForce < -powerLimit ? -powerLimit : rollForce;
-        motor1power += rollForce;
-        motor2power += -rollForce;
-        motor3power += -rollForce;
-        motor4power += rollForce;
+		//СѓРїСЂР°РІР»РµРЅРёРµ РєСЂРµРЅРѕРј:
+		//РґРµР№СЃС‚РІСѓРµРј РїРѕ Р°РЅР°Р»РѕРіРёРё СЃ С‚Р°РЅРіР°Р¶РµРј, С‚РѕР»СЊРєРѕ СЂРµРіСѓР»РёСЂСѓРµРј Р±РѕРєРѕРІС‹Рµ РґРІРёРіР°С‚РµР»Рё
+		double rollForce = - rollPID.calc (0, dRoll / 180.0);
+		rollForce = rollForce > powerLimit ? powerLimit : rollForce;
+		rollForce = rollForce < -powerLimit ? -powerLimit : rollForce;
+		motor1power +=   rollForce;
+		motor2power += - rollForce;
+		motor3power += - rollForce;
+		motor4power +=   rollForce;
 
-        //управление рысканием:
-        double yawForce = yawPID.calc(0, dYaw / 180.0);
-        yawForce = yawForce > powerLimit ? powerLimit : yawForce;
-        yawForce = yawForce < -powerLimit ? -powerLimit : yawForce;
-        motor1power += yawForce;
-        motor2power += -yawForce;
-        motor3power += yawForce;
-        motor4power += -yawForce;
+		//СѓРїСЂР°РІР»РµРЅРёРµ СЂС‹СЃРєР°РЅРёРµРј:
+		double yawForce = yawPID.calc (0, dYaw / 180.0);
+		yawForce = yawForce > powerLimit ? powerLimit : yawForce;
+		yawForce = yawForce < -powerLimit ? -powerLimit : yawForce;
+		motor1power +=   yawForce;
+		motor2power += - yawForce;
+		motor3power +=   yawForce;
+		motor4power += - yawForce;
 
-        GameObject.Find("Motor1").GetComponent<motorScript>().power = (float)motor1power;
-        GameObject.Find("Motor2").GetComponent<motorScript>().power = (float)motor2power;
-        GameObject.Find("Motor3").GetComponent<motorScript>().power = (float)motor3power;
-        GameObject.Find("Motor4").GetComponent<motorScript>().power = (float)motor4power;
-    }
+		GameObject.Find ("Motor1").GetComponent<motorScript>().power = motor1power;
+		GameObject.Find ("Motor2").GetComponent<motorScript>().power = motor2power;
+		GameObject.Find ("Motor3").GetComponent<motorScript>().power = motor3power;
+		GameObject.Find ("Motor4").GetComponent<motorScript>().power = motor4power;
+	}
 
-    //как советуют в доке по Unity вычисления проводим в FixedUpdate, а не в Update
-    void FixedUpdate()
-    {
-        readRotation();
-        stabilize();
-    }
-
+	//РєР°Рє СЃРѕРІРµС‚СѓСЋС‚ РІ РґРѕРєРµ РїРѕ Unity РІС‹С‡РёСЃР»РµРЅРёСЏ РїСЂРѕРІРѕРґРёРј РІ FixedUpdate, Р° РЅРµ РІ Update
+	void FixedUpdate () {
+		readRotation ();
+		stabilize ();
+	}
+	
 }
 
-public class PID
-{
-
-    private double P;
-    private double I;
-    private double D;
-
-    private double prevErr;
-    private double sumErr;
-
-    public PID(double P, double I, double D)
-    {
-        this.P = P;
-        this.I = I;
-        this.D = D;
-    }
-
-    public double calc(double current, double target)
-    {
-
-        double dt = Time.fixedDeltaTime;
-
-        double err = target - current;
-        this.sumErr += err;
-
-        double force = this.P * err + this.I * this.sumErr * dt + this.D * (err - this.prevErr) / dt;
-
-        this.prevErr = err;
-        return force;
-    }
-
+public class PID {
+	
+	private double P;
+	private double I;
+	private double D;
+	
+	private double prevErr;
+	private double sumErr;
+	
+	public PID (double P, double I, double D) {
+		this.P = P;
+		this.I = I;
+		this.D = D;
+	}
+	
+	public double calc (double current, double target) {
+		
+		double dt = Time.fixedDeltaTime;
+		
+		double err = target - current;
+		this.sumErr += err;
+		
+		double force = this.P * err + this.I * this.sumErr * dt + this.D * (err - this.prevErr) / dt;
+		
+		this.prevErr = err;
+		return force;
+	}
+	
 };
