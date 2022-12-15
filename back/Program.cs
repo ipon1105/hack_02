@@ -8,4 +8,8 @@ batteriList1.Add(new Battery(10u, true));
 batteriList1.Add(new Battery(15u, true));
 batteriList1.Add(new Battery(20u, true));
 
-ServiceStation station1 = new ServiceStation(batteriList1, missionList1, uvaList1);
+ServiceStation station1 = new ServiceStation(
+    batteriList1, 
+    missionList1, 
+    uvaList1
+);

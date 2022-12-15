@@ -24,21 +24,41 @@ enum GEOREP {
     SPHERE,     // Сфера
 }
 
+// Состояние батареи
+enum ChargeState{
+    // Простаивает
+    IDLE,
+    // Работает
+    WORK,
+    // Заряжается
+    CHARGING,
+}
+
 // Класс батарея
 class Battery{
     public uint maxCharge; // Максимальный заряд батареи в минутах
     public uint curCharge; // Текущий заряд батареи в минутах
+    public ChargeState state;   // Состояние батаре
 
     // Конструктор батарей
-    public Battery(uint maxCharge, bool isFull){
+        public Battery(uint maxCharge, bool isFull){
         this.maxCharge = maxCharge;
         this.curCharge = (isFull) ? maxCharge : 0;
+        this.state = ChargeState.IDLE;
     }
 
     // Конструктор батарей
     public Battery(uint maxCharge, uint curCharge){
         this.maxCharge = maxCharge;
         this.curCharge = curCharge;
+        this.state = ChargeState.IDLE;
+    }
+
+    // Заряд в процентах
+    public float getPercentCharge(){
+        if (curCharge == 0)
+            return 0.0f;
+        return (float)maxCharge / (float)curCharge;
     }
 }
 
@@ -105,6 +125,55 @@ class Mission{
 
 }
 
+// Зарядная станция
+class ChargerStation {
+    // Ограниченная ли в электричестве станция зарядки
+    private Boolean isLimited;
+    // Максимальное количество электроэнергии в минутах
+    private uint maxCharge;
+    // Текущее количество электроэнергии в минутах
+    private uint curCharge;
+    // Максимальное количество одновременно заряжаемых устройств
+    private uint maxUVCount;
+    // Список батарей на зарядке
+    private List<Battery> batteryList;
+    // За сколько секунд зарядится один процент батареи
+    private uint chargingTime;
+
+
+    // Конструктор
+    public ChargerStation(Boolean isLimited, uint maxCharge, uint curCharge, uint maxUVCount, uint chargingTime){
+        this.isLimited = isLimited;
+        this.maxCharge = maxCharge;
+        this.curCharge = curCharge;
+        this.maxUVCount = maxUVCount;
+        this.chargingTime = chargingTime;
+
+        batteryList = new List<Battery>();
+    }
+
+    // Добавить батарею
+    public void startCharging(Battery battery){
+        battery.state = ChargeState.CHARGING;
+        this.batteryList.Add(battery);
+        
+        Thread t = new Thread(new ParameterizedThreadStart(charging));
+        t.Start(battery);
+
+    }
+
+    private void charging(object battery){
+        Battery bat = (Battery) battery;
+        bat.state = ChargeState.IDLE;
+    }
+
+    // Удалить батарею
+    public void deleteBattery(Battery battery){
+        this.batteryList.Add(battery);
+    }
+}
+
+// Станция управления
 class ServiceStation {
     // ПОЛЯ:
     
