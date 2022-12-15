@@ -36,19 +36,19 @@ enum ChargeState{
 
 // Класс батарея
 class Battery{
-    public uint maxCharge; // Максимальный заряд батареи в минутах
-    public uint curCharge; // Текущий заряд батареи в минутах
+    public float maxCharge; // Максимальный заряд батареи в киловатах
+    public float curCharge; // Текущий заряд батареи в киловатах
     public ChargeState state;   // Состояние батаре
 
     // Конструктор батарей
-        public Battery(uint maxCharge, bool isFull){
+        public Battery(float maxCharge, bool isFull){
         this.maxCharge = maxCharge;
         this.curCharge = (isFull) ? maxCharge : 0;
         this.state = ChargeState.IDLE;
     }
 
     // Конструктор батарей
-    public Battery(uint maxCharge, uint curCharge){
+    public Battery(float maxCharge, float curCharge){
         this.maxCharge = maxCharge;
         this.curCharge = curCharge;
         this.state = ChargeState.IDLE;
@@ -60,9 +60,26 @@ class Battery{
             return 0.0f;
         return (float)maxCharge / (float)curCharge;
     }
-}
 
-// Модель БПА
+    // Добавить заряда, Возвращает true, если зарядился полностью
+    public float plusCharge(float charge){
+        this.curCharge += charge;
+        if (this.curCharge >= this.maxCharge){
+            float tmp = this.curCharge - maxCharge;
+            this.curCharge = this.maxCharge;
+            return tmp;
+        }
+        return 0.0f;
+    }
+
+    // Батарею в стринг
+    public String toString(){
+        return "Battery: { " + 
+            curCharge.ToString() + "/" + maxCharge.ToString() + "; " +
+            state.ToString() + " " +
+            "}";
+    }
+}
 
 // Класс беспилотника
 abstract class UV{
@@ -127,49 +144,171 @@ class Mission{
 
 // Зарядная станция
 class ChargerStation {
+    private const int MINUTE = 1000; 
+    private Mutex curBlock = new();
+
     // Ограниченная ли в электричестве станция зарядки
     private Boolean isLimited;
-    // Максимальное количество электроэнергии в минутах
-    private uint maxCharge;
-    // Текущее количество электроэнергии в минутах
-    private uint curCharge;
+    // Максимальное количество электроэнергии в киловатах
+    private float maxCharge;
+    // Текущее количество электроэнергии в киловатах
+    private float curCharge;
+    // Скорость зарядки батареи в киловатах/минуты
+    private float chargingKiloWatInMin;
+    // Ожидаемое количество заряда после зарядки всех текущих
+    private float waitingChargeInEnd;
     // Максимальное количество одновременно заряжаемых устройств
     private uint maxUVCount;
-    // Список батарей на зарядке
-    private List<Battery> batteryList;
-    // За сколько секунд зарядится один процент батареи
-    private uint chargingTime;
-
+    // Число батарей на зарядке
+    private uint chargingBatteryCount;
+    //Переменная до какого значения заряжать
+    private float chargingUntilValue;
 
     // Конструктор
-    public ChargerStation(Boolean isLimited, uint maxCharge, uint curCharge, uint maxUVCount, uint chargingTime){
+    public ChargerStation(Boolean isLimited, float maxCharge, float curCharge, uint maxUVCount, float chargingKiloWatInMin){
         this.isLimited = isLimited;
         this.maxCharge = maxCharge;
         this.curCharge = curCharge;
         this.maxUVCount = maxUVCount;
-        this.chargingTime = chargingTime;
+        this.chargingKiloWatInMin = chargingKiloWatInMin;
+        this.waitingChargeInEnd = curCharge;
 
-        batteryList = new List<Battery>();
+        chargingBatteryCount = 0;
     }
 
-    // Добавить батарею
-    public void startCharging(Battery battery){
-        battery.state = ChargeState.CHARGING;
-        this.batteryList.Add(battery);
+    // Добавить батарею на зарядку
+    public Boolean startCharging(Battery battery){
+        Console.WriteLine("Try add to charging");
+
+        curBlock.WaitOne();
+        // Все зарядки заняты ли?
+        if (chargingBatteryCount >= maxUVCount){
+            Console.WriteLine("Charging is fail");
+            return false;
+        }
+
+        // При попытке добавить новую батарею мы проверяем 
+        // есть ли смысл распределять весь оставшийся заряд
+        // на n батареи и их хватит (они все будут полными)
+        // или же мы получим несколько неполных батарей 
+        if (waitingChargeInEnd <= 0){
+            Console.WriteLine("Charging is fail");
+            return false;
+        }
+
+        chargingBatteryCount++;
+        if (waitingChargeInEnd - (battery.maxCharge - battery.curCharge) < 0){
+            battery.state = ChargeState.CHARGING;
+            chargingUntilValue = waitingChargeInEnd;
+
+            Thread t = new Thread(new ParameterizedThreadStart(chargingUntil));
+            t.Start(battery);
+
+            waitingChargeInEnd = 0;
+        } else{
+            waitingChargeInEnd -= (battery.maxCharge - battery.curCharge);
+            battery.state = ChargeState.CHARGING;
+            Thread t = new Thread(new ParameterizedThreadStart(charging));
+            t.Start(battery);
+        }
+        curBlock.ReleaseMutex();
+
+
+        Console.WriteLine("Charging is succefull");
+        return true;
+    }
+
+    // Заряжать до ограничителя chargingUntilValue
+    private void chargingUntil(object battery){
         
-        Thread t = new Thread(new ParameterizedThreadStart(charging));
-        t.Start(battery);
+        Console.WriteLine("Start Charging");
 
-    }
-
-    private void charging(object battery){
         Battery bat = (Battery) battery;
+        float start = 0.0f;
+        
+        // Эмитация зарядки
+        do{
+            curBlock.WaitOne();
+
+            float loadVal = (chargingUntilValue - start > chargingKiloWatInMin)?chargingKiloWatInMin : chargingUntilValue - start;
+            Thread.Sleep(MINUTE);
+
+            // В станции закончилось электричество
+            if (this.curCharge <= 0){
+                Console.WriteLine("The Station is empty.");
+                curBlock.ReleaseMutex();
+                break;
+            }
+            
+            bat.plusCharge(loadVal);
+            start+=loadVal;
+            this.curCharge -= loadVal;
+
+            curBlock.ReleaseMutex();
+            Console.WriteLine(bat.toString());
+            Console.WriteLine(this.toString());
+
+
+        } while(start < chargingUntilValue);
+        curBlock.WaitOne();
+        
+        Console.WriteLine("Stop Charging");
         bat.state = ChargeState.IDLE;
+        chargingBatteryCount--;
+        curBlock.ReleaseMutex();
+
+        Console.WriteLine(bat.toString());
+        Console.WriteLine(this.toString());
     }
 
-    // Удалить батарею
-    public void deleteBattery(Battery battery){
-        this.batteryList.Add(battery);
+    // Зарядка до определённого размера
+    private void charging(object battery){
+        Console.WriteLine("Start Charging");
+
+        Battery bat = (Battery) battery;
+        float tmpWats = 0.0f;
+        
+        // Эмитация зарядки
+        do{
+            Thread.Sleep(MINUTE);
+
+            // В станции закончилось электричество
+            curBlock.WaitOne();
+            if (this.curCharge <= 0){
+                Console.WriteLine("The Station is empty.");
+                curBlock.ReleaseMutex();
+                break;
+            }
+            
+            // Если станция ограничена
+            tmpWats = chargingKiloWatInMin;
+            if (isLimited) {
+                if (this.curCharge - tmpWats < 0){
+                    tmpWats = this.curCharge;
+                    this.curCharge = 0.0f;
+                } else 
+                    this.curCharge -= tmpWats;
+            }
+            curBlock.ReleaseMutex();
+            Console.WriteLine(bat.toString());
+            Console.WriteLine(this.toString());
+
+        } while((tmpWats = bat.plusCharge(tmpWats)) == 0.0f);
+        curBlock.WaitOne();
+        this.curCharge += tmpWats;
+        
+        Console.WriteLine("Stop Charging");
+        bat.state = ChargeState.IDLE;
+        chargingBatteryCount--;
+        curBlock.ReleaseMutex();
+
+        Console.WriteLine(bat.toString());
+        Console.WriteLine(this.toString());
+    }
+
+    // Возвращает статус строкой
+    public String toString(){
+        return "Station has " + curCharge.ToString() + "/" + maxCharge.ToString() + ". On station charging " + chargingBatteryCount.ToString() + "/" + maxUVCount.ToString() + ".";
     }
 }
 
