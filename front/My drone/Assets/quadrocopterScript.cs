@@ -85,8 +85,8 @@ public class quadrocopterScript : MonoBehaviour
         rollForce = rollForce < -powerLimit ? -powerLimit : rollForce;
         motor1power += rollForce;
         motor2power += -rollForce;
-        motor3power += -rollForce;
-        motor4power += rollForce;
+        motor3power += +rollForce;
+        motor4power += -rollForce;
 
         //управление рысканием:
         double yawForce = yawPID.calc(0, dYaw / 180.0);
