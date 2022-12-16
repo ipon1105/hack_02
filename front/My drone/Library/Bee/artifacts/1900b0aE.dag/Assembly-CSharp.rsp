@@ -355,6 +355,7 @@
 -r:"Library/Bee/artifacts/1900b0aE.dag/UnityEngine.UI.ref.dll"
 "Assets/motorScript.cs"
 "Assets/quadrocopterScript.cs"
+"Assets/TriggerStop.cs"
 "Assets/TriggerTest.cs"
 -langversion:9.0
 
